@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileText, Download, ChevronRight, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 const Index = () => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -54,9 +56,52 @@ const Index = () => {
     }
   };
 
-  const handleDownload = () => {
-    toast.success("Resume download started! (PDF generation would be implemented here)");
-    // In a real implementation, you would use a library like jsPDF or html2pdf
+  const handleDownload = async () => {
+    const resumeElement = document.getElementById("resume-preview");
+    if (!resumeElement) {
+      toast.error("Resume preview not found!");
+      return;
+    }
+
+    try {
+      toast.loading("Generating PDF...");
+      
+      const canvas = await html2canvas(resumeElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 0;
+
+      pdf.addImage(imgData, "PNG", imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      
+      const fileName = resumeData.personalInfo.fullName 
+        ? `${resumeData.personalInfo.fullName.replace(/\s+/g, "_")}_Resume.pdf`
+        : "Resume.pdf";
+      
+      pdf.save(fileName);
+      toast.dismiss();
+      toast.success("PDF downloaded successfully!");
+    } catch (error) {
+      toast.dismiss();
+      toast.error("Failed to generate PDF. Please try again.");
+      console.error("PDF generation error:", error);
+    }
   };
 
   const handlePrint = () => {
@@ -198,7 +243,9 @@ const Index = () => {
                 </span>
               </div>
               <ScrollArea className="h-[calc(100vh-12rem)]">
-                <ResumePreview data={resumeData} />
+                <div id="resume-preview">
+                  <ResumePreview data={resumeData} />
+                </div>
               </ScrollArea>
             </div>
           </div>
